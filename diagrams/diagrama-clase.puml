@@ -1,0 +1,166 @@
+@startuml 02_diagrama_de_clases
+title Diagrama de clases - RutaNorte Logistics
+skinparam shadowing false
+skinparam classAttributeIconSize 0
+
+package "Aplicacion" {
+  class CotizacionService <<APPLICATION>> {
+    solicitarCotizacion()
+    emitirCotizacion()
+    aceptarCotizacion()
+    rechazarCotizacion()
+  }
+  class OrdenServicioService <<APPLICATION>> {
+    generarOrdenDeServicio()
+    reasignarOperador()
+    registrarRecoleccion()
+    rechazarMercancia()
+    iniciarTrayecto()
+    registrarLlegadaADestino()
+    registrarIncidencia()
+    registrarDestinatarioAusente()
+    definirReintentoEntrega()
+    confirmarEntrega()
+  }
+  class UnitOfWork <<APPLICATION>> {
+    iniciar()
+    confirmar()
+    revertir()
+  }
+  class Notificador <<APPLICATION>> {
+    alertar(rol, folio, mensaje)
+  }
+  class EstatusOrdenQueryHandler <<APPLICATION>> {
+    manejar(ConsultarEstatusDeOrden)
+  }
+  class RentabilidadQueryHandler <<APPLICATION>> {
+    manejar(ConsultarRentabilidad)
+  }
+  class SeguimientoLectura <<APPLICATION>> {
+    obtenerEstatus(folio)
+  }
+  class RentabilidadLectura <<APPLICATION>> {
+    obtenerRentabilidad(periodo, agrupacion)
+  }
+  class EstatusOrdenView <<APPLICATION>> {
+    folio
+    estatus
+    ubicacion
+    historial
+  }
+  class RentabilidadView <<APPLICATION>> {
+    grupo
+    ingresos
+    gastos
+    rentabilidad
+    tiempos
+  }
+}
+
+package "Dominio" {
+  class OrdenDeServicio <<DOMAIN>> {
+    bitacora
+    incidencias
+    asignacion
+    evidenciaDeEntrega
+    --
+    asignarRecurso()
+    reasignarOperador()
+    registrarRecoleccion()
+    rechazarMercancia()
+    iniciarTrayecto()
+    registrarLlegada()
+    registrarIncidencia()
+    registrarDestinatarioAusente()
+    definirReintento()
+    confirmarEntrega()
+  }
+  class CalculadoraDeTarifa <<DOMAIN>> {
+    calcular(mercancia, ruta, unidad, cliente)
+  }
+  class Unidad <<DOMAIN>> {
+    asignar()
+    liberar()
+  }
+  class Operador <<DOMAIN>> {
+    asignar()
+    liberar()
+  }
+  class Cliente <<DOMAIN>> {
+    obtenerPorId()
+  }
+  class AsignadorDeRecursos <<DOMAIN>> {
+    asignar(orden, unidades, operadores)
+  }
+
+  interface CotizacionRepository <<DOMAIN>> {
+    obtenerPorFolio()
+    guardar()
+    siguienteFolio()
+  }
+  interface OrdenServicioRepository <<DOMAIN>> {
+    obtenerPorFolio()
+    guardar()
+    obtenerPorCotizacion()
+    siguienteFolio()
+  }
+  interface UnidadRepository <<DOMAIN>> {
+    obtenerPorId()
+    guardar()
+    listarDisponibles()
+  }
+  interface OperadorRepository <<DOMAIN>> {
+    obtenerPorId()
+    guardar()
+    listarDisponibles()
+    obtenerComodin()
+  }
+  interface ClienteRepository <<DOMAIN>> {
+    obtenerPorId()
+  }
+}
+
+package "Infraestructura" {
+  class RepositorioSQL <<INFRAESTRUCTURA>> {
+    CotizacionRepositorySql
+    OrdenServicioRepositorySql
+    UnidadRepositorySql
+    OperadorRepositorySql
+    ClienteRepositorySql
+  }
+}
+
+CotizacionService --> UnitOfWork : usa
+UnitOfWork --> Notificador : notifica
+OrdenServicioService --> UnitOfWork : usa
+OrdenServicioService --> OrdenDeServicio : genera
+
+EstatusOrdenQueryHandler --> SeguimientoLectura : consulta
+RentabilidadQueryHandler --> RentabilidadLectura : consulta
+SeguimientoLectura --> EstatusOrdenView : devuelve
+RentabilidadLectura --> RentabilidadView : devuelve
+
+CalculadoraDeTarifa "1" -- "0..*" OrdenDeServicio : coordina
+OrdenDeServicio "1" --> "1..*" Unidad : gestiona
+OrdenDeServicio "1" --> "1" Operador : gestiona
+Cliente "1" --> "1" AsignadorDeRecursos : gestiona
+AsignadorDeRecursos ..> Unidad
+AsignadorDeRecursos ..> Operador
+
+OrdenServicioRepository --> OrdenDeServicio : gestiona
+UnidadRepository --> Unidad : gestiona
+OperadorRepository --> Operador : gestiona
+ClienteRepository --> Cliente : gestiona
+
+RepositorioSQL ..|> CotizacionRepository : implementa
+RepositorioSQL ..|> OrdenServicioRepository : implementa
+RepositorioSQL ..|> UnidadRepository : implementa
+RepositorioSQL ..|> OperadorRepository : implementa
+RepositorioSQL ..|> ClienteRepository : implementa
+CalculadoraDeTarifa --> RepositorioSQL : usa
+
+OrdenServicioService ..> OrdenServicioRepository
+OrdenServicioService ..> UnidadRepository
+OrdenServicioService ..> OperadorRepository
+CotizacionService ..> CotizacionRepository
+@enduml
