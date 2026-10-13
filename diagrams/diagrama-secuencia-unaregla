@@ -1,0 +1,40 @@
+@startuml 04_secuencia_rechazar_mercancia
+title Secuencia 2 – Rechazar mercancía por discrepancia en origen (CU-03 · US-09)
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam sequenceMessageAlign center
+
+participant "Operador" as Op
+participant "Operaciones" as Ops
+participant "App del operador" as App
+participant "OrdenServicioService" as Svc <<APP>>
+participant "UnitOfWork" as UoW <<APP>>
+participant "Notificador" as Not <<APP>>
+participant "OrdenServicioRepository" as Repo <<DOM>>
+participant "Orden de servicio" as Ord <<DOM>>
+
+Op -> App : inspecciona y encuentra una discrepancia;\nselecciona "Mercancía rechazada" y adjunta fotos
+App -> Svc : rechazarMercancia(numeroDeOrden, tipoDeDiscrepancia, fotos, observaciones)
+Svc -> UoW : iniciar()
+Svc -> Repo : obtenerPorNumero(numeroDeOrden)
+Repo --> Svc : orden
+Svc -> Ord : rechazarMercancia(tipoDeDiscrepancia, fotos, observaciones)
+Ord -> Ord : valida tipo de discrepancia (G-13),\nfotos y estatus de la orden
+
+alt discrepancia válida con fotos
+  Ord -> Ord : registra incidencia "mercancía rechazada",\nregistra en Bitácora, detiene el flujo\nemite MercanciaRechazada
+  Ord --> Svc : ok
+  Svc -> Repo : guardar(orden)
+  Svc -> UoW : confirmar()
+  Svc -> Not : alertar(Operaciones, numeroDeOrden, mensaje)
+  Not --> Ops : aviso de mercancía rechazada
+  Svc --> App : incidencia registrada y orden detenida
+  App --> Op : espera instrucciones de Operaciones
+else sin tipo de discrepancia, sin fotos o transición inválida
+  Ord --> Svc : error de negocio\n(EvidenciaIncompleta / TransicionDeEstatusInvalida)
+  Svc -> UoW : revertir()
+  Svc --> App : solicita tipo de discrepancia y fotos
+end
+
+note over Ops : Operaciones resuelve la discrepancia\ncon el cliente (BPMN)
+@enduml
